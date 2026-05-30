@@ -1129,27 +1129,27 @@ export default function App() {
           <div className="login-logo">🔬</div>
           <h2 className="login-title">Hospital Lab Portal</h2>
           <p className="login-subtitle">Enter your credentials to access the register</p>
-          
+
           <div className="login-form">
             <div className="form-group" style={{ marginBottom: 16 }}>
               <label className="field-lbl">Username</label>
-              <input 
-                type="text" 
-                value={username} 
-                onChange={(e) => { setUsername(e.target.value); setLoginError(""); }} 
-                placeholder="e.g. DV1404"
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => { setUsername(e.target.value); setLoginError(""); }}
+                // placeholder="e.g. DV1404"
                 className={loginError ? "input-err" : ""}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
-            
+
             <div className="form-group" style={{ marginBottom: 20 }}>
               <label className="field-lbl">Password</label>
-              <input 
-                type="password" 
-                value={password} 
-                onChange={(e) => { setPassword(e.target.value); setLoginError(""); }} 
-                placeholder="••••"
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setLoginError(""); }}
+                // placeholder="••••"
                 className={loginError ? "input-err" : ""}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />

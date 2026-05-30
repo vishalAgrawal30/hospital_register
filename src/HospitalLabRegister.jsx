@@ -96,12 +96,13 @@ const CSS = `
 body { font-family: var(--font); background: #EEF2F7; color: var(--g900); min-height: 100vh; font-size: 14px; }
 
 /* HEADER */
-.hdr { background: linear-gradient(135deg,#1565C0,#0D47A1); color: #fff; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.22); }
+.hdr { background: linear-gradient(135deg,#1565C0,#0D47A1); color: #fff; padding: 0 16px; min-height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.22); gap: 12px; flex-wrap: wrap; }
 .hdr-ico { width: 34px; height: 34px; background: rgba(255,255,255,.18); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .hdr-title { font-size: 15px; font-weight: 700; line-height: 1.2; }
 .hdr-sub { font-size: 11px; opacity: .72; }
-.hdr-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.14); color: #fff; font-family: var(--font); }
+.hdr-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; font-size: 15px; cursor: pointer; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.14); color: #fff; transition: background 0.15s, transform 0.15s; }
 .hdr-btn:hover { background: rgba(255,255,255,.25); }
+.hdr-btn:active { transform: scale(0.95); }
 
 /* TABS */
 .tabs { background: #fff; border-bottom: 1px solid var(--border); display: flex; padding: 0 12px; overflow-x: auto; scrollbar-width: none; }
@@ -1181,9 +1182,9 @@ export default function App() {
             <div className="hdr-sub">Microbiology &amp; Culture Report System</div>
           </div>
         </div>
-        <div>
-          <button className="hdr-btn" onClick={() => exportExcel(records, toast)}>📥 Export</button>
-          <button className="hdr-btn" style={{ marginLeft: 8, background: "rgba(198,40,40,0.18)", borderColor: "rgba(198,40,40,0.35)" }} onClick={handleLogout}>🚪 Logout</button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button className="hdr-btn" onClick={() => exportExcel(records, toast)} title="Export to Excel">📥</button>
+          <button className="hdr-btn" style={{ background: "rgba(198,40,40,0.18)", borderColor: "rgba(198,40,40,0.35)" }} onClick={handleLogout} title="Logout">🚪</button>
         </div>
       </header>
 

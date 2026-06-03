@@ -360,6 +360,169 @@ const CSS = `
     25% { transform: translateX(-4px); }
     75% { transform: translateX(4px); }
   }
+
+  /* IMPORT EXCEL MODAL SPECIFIC */
+  .upload-zone {
+    border: 2px dashed var(--g300);
+    border-radius: var(--rad-lg);
+    padding: 32px 20px;
+    text-align: center;
+    background: var(--g50);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .upload-zone:hover {
+    border-color: var(--pri);
+    background: var(--pri-light);
+  }
+  .upload-zone-icon {
+    font-size: 36px;
+  }
+  .upload-zone-text {
+    font-weight: 600;
+    color: var(--g700);
+  }
+  .upload-zone-subtext {
+    font-size: 11px;
+    color: var(--g500);
+  }
+  .mapping-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .mapping-card {
+    border: 1px solid var(--border);
+    border-radius: var(--rad);
+    background: #fff;
+    padding: 14px;
+  }
+  .mapping-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--g900);
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--g100);
+    padding-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mapping-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+  }
+  .mapping-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .mapping-field label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--g700);
+    text-transform: uppercase;
+  }
+  .mapping-field select {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .accordion-trigger {
+    background: var(--g100);
+    border: none;
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 12px;
+    border-radius: var(--rad);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+  }
+  .accordion-trigger:hover {
+    background: var(--g200);
+  }
+  .validation-banner {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--rad);
+    margin-bottom: 16px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .validation-banner-success {
+    background: var(--success-light);
+    color: var(--success);
+    border: 1px solid #c8e6c9;
+  }
+  .validation-banner-warning {
+    background: var(--warn-light);
+    color: var(--warn);
+    border: 1px solid #ffe0b2;
+  }
+  .import-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .import-summary-card {
+    background: var(--g50);
+    border: 1px solid var(--border);
+    padding: 10px;
+    border-radius: var(--rad);
+    text-align: center;
+  }
+  .import-summary-val {
+    font-size: 18px;
+    font-weight: 700;
+    font-family: var(--mono);
+  }
+  .import-summary-lbl {
+    font-size: 10px;
+    color: var(--g500);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .strategy-select {
+    margin-bottom: 16px;
+    background: var(--g50);
+    border: 1px solid var(--border);
+    padding: 12px;
+    border-radius: var(--rad);
+  }
+  .strategy-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .strategy-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .strategy-option input {
+    width: auto;
+    margin-top: 3px;
+    cursor: pointer;
+  }
+  .strategy-option-desc {
+    font-size: 11px;
+    color: var(--g500);
+  }
   `;
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -514,6 +677,618 @@ const ViewModal = ({ record, onClose, onEdit, onDelete }) => {
           <button className="btn btn-danger btn-sm" onClick={() => onDelete(record.id)}>🗑️ Delete</button>
           <button className="btn btn-outline btn-sm" onClick={() => onEdit(record.id)}>✏️ Edit</button>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── EXCEL IMPORT HELPERS ──────────────────────────────────────────────────────
+const parseExcelDate = (val) => {
+  if (val === undefined || val === null || val === "") return "";
+
+  // ── 1. Native JS Date (from cellDates: true) ──────────────────────────────
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return "";
+    // Use UTC methods to avoid local timezone shifting the day
+    const y = val.getUTCFullYear();
+    const m = String(val.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(val.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // ── 2. Excel Serial Number (integer, NOT a JS Date) ────────────────────────
+  if (typeof val === "number") {
+    const num = Math.round(val); // avoid float drift
+    if (num < 1 || num > 2958465) return ""; // outside 1900-01-01 to 9999-12-31
+    // Excel serial: days since 1900-01-00 (with the Lotus 1-2-3 leap year bug)
+    const msPerDay = 86400 * 1000;
+    const utcMs = (num - 25569) * msPerDay;
+    const date = new Date(utcMs);
+    if (isNaN(date.getTime())) return "";
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(date.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  const str = String(val).trim();
+  if (!str) return "";
+
+  // ── 3. Strict ISO  YYYY-MM-DD or YYYY/MM/DD (4-digit year only) ───────────
+  const isoMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (isoMatch) {
+    const y = isoMatch[1];
+    const m = isoMatch[2].padStart(2, "0");
+    const d = isoMatch[3].padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // ── 4. DD/MM/YYYY or DD-MM-YYYY (4-digit year) — Indian format FIRST ──────
+  const dmyMatch4 = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dmyMatch4) {
+    const d = dmyMatch4[1].padStart(2, "0");
+    const m = dmyMatch4[2].padStart(2, "0");
+    const y = dmyMatch4[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // ── 5. DD Mon YYYY  (e.g. "20 Jun 2026") ─────────────────────────────────
+  const months = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+  };
+  const textMatch = str.match(/^(\d{1,2})[- ]([A-Za-z]{3,9})[- ,]*(\d{4})/);
+  if (textMatch) {
+    const d = textMatch[1].padStart(2, "0");
+    const mo = months[textMatch[2].toLowerCase().slice(0, 3)];
+    const y = textMatch[3];
+    if (mo) return `${y}-${String(mo).padStart(2, "0")}-${d}`;
+  }
+
+  // ── 6. DD/MM/YY or DD-MM-YY (2-digit year) ───────────────────────────────
+  const dmyMatch2 = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/);
+  if (dmyMatch2) {
+    const d = dmyMatch2[1].padStart(2, "0");
+    const m = dmyMatch2[2].padStart(2, "0");
+    const y = "20" + dmyMatch2[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  return "";
+};
+
+const autoMapColumns = (headers) => {
+  const mapping = {};
+  const coreFields = {
+    date: ["date", "dt", "collection", "adm", "date of collection"],
+    ipdopd: ["ipd", "opd", "reg", "cr no", "no.", "ipd/opd"],
+    patientName: ["patient name", "name", "patient", "pt name", "name of patient"],
+    ward: ["ward", "dept", "location", "unit", "ward group"],
+    sample: ["sample", "specimen", "material", "sample type"],
+    gramStain: ["gram", "stain result", "gram stain"],
+    znStain: ["zn", "afb", "zn stain"],
+    koh: ["koh", "fungal", "koh mount"],
+    organism: ["organism", "isolate", "bacteria", "organism isolated"],
+    remarks: ["remarks", "notes", "comment", "remarks / notes"]
+  };
+
+  const lowerHeaders = headers.map(h => String(h || "").toLowerCase().trim());
+
+  const findMatchIndex = (keywords) => {
+    for (const kw of keywords) {
+      const idx = lowerHeaders.findIndex(h => h === kw);
+      if (idx !== -1) return idx;
+    }
+    for (const kw of keywords) {
+      const idx = lowerHeaders.findIndex(h => h.includes(kw));
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  };
+
+  Object.entries(coreFields).forEach(([field, keywords]) => {
+    const idx = findMatchIndex(keywords);
+    if (idx !== -1) {
+      mapping[field] = idx;
+    }
+  });
+
+  ALL_ABX.forEach((abx) => {
+    const codeLower = abx.code.toLowerCase();
+    const nameLower = abx.name.toLowerCase();
+
+    const idx = lowerHeaders.findIndex(h => {
+      return h === codeLower ||
+        h.startsWith(codeLower + "\n") ||
+        h.startsWith(codeLower + " ") ||
+        h.includes(`(${codeLower})`) ||
+        h.includes(nameLower);
+    });
+
+    if (idx !== -1) {
+      mapping[`ast_${abx.code}`] = idx;
+    }
+  });
+
+  return mapping;
+};
+
+// ── IMPORT MODAL ──────────────────────────────────────────────────────────────
+const ImportModal = ({ onClose, onImport, currentRecords, toast }) => {
+  const [step, setStep] = useState(1); // 1: Upload, 2: Map, 3: Preview
+  const [fileName, setFileName] = useState("");
+  const [headers, setHeaders] = useState([]);
+  const [rawData, setRawData] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [astExpanded, setAstExpanded] = useState(false);
+  const [importStrategy, setImportStrategy] = useState("merge"); // append, merge, overwrite
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processFile(file);
+  };
+
+  const processFile = (file) => {
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array", cellDates: true });
+        if (workbook.SheetNames.length === 0) {
+          toast("Excel file has no sheets", "error");
+          return;
+        }
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+        if (rows.length === 0) {
+          toast("Selected sheet is empty", "error");
+          return;
+        }
+
+        // Find the actual header row (skip empty rows and titles)
+        let headerRowIdx = 0;
+        const coreKeywords = ["date", "name", "ward", "patient", "ipd", "opd", "sample", "specimen"];
+        for (let i = 0; i < Math.min(rows.length, 15); i++) {
+          const row = rows[i] || [];
+          const hasKeyword = row.some((cell) => {
+            const str = String(cell || "").toLowerCase();
+            return coreKeywords.some(kw => str.includes(kw));
+          });
+          if (hasKeyword) {
+            headerRowIdx = i;
+            break;
+          }
+          const populatedCount = row.filter(cell => cell !== undefined && cell !== null && String(cell).trim() !== "").length;
+          if (populatedCount >= 3) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+
+        const sheetHeaders = rows[headerRowIdx].map((h) => String(h || "").trim());
+
+        // Extract raw data and filter out completely empty rows
+        const rawSheetData = rows.slice(headerRowIdx + 1);
+        const sheetData = rawSheetData.filter((row) => {
+          return row.some((cell) => cell !== undefined && cell !== null && String(cell).trim() !== "");
+        });
+
+        setHeaders(sheetHeaders);
+        setRawData(sheetData);
+
+        const autoMap = autoMapColumns(sheetHeaders);
+        setMapping(autoMap);
+
+        setStep(2);
+      } catch (err) {
+        console.error(err);
+        toast("Failed to parse Excel file", "error");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const mapRowToRecord = (row) => {
+    const record = { ast: {} };
+
+    const coreFields = ["date", "ipdopd", "patientName", "ward", "sample", "gramStain", "znStain", "koh", "organism", "remarks"];
+    coreFields.forEach((field) => {
+      const idx = mapping[field];
+      if (idx !== undefined && idx !== -1) {
+        let val = row[idx];
+        if (val !== undefined && val !== null && val !== "") {
+          if (field === "date") {
+            record.date = parseExcelDate(val);
+          } else {
+            record[field] = String(val).trim();
+          }
+        }
+      }
+    });
+
+    ALL_ABX.forEach((abx) => {
+      const idx = mapping[`ast_${abx.code}`];
+      if (idx !== undefined && idx !== -1) {
+        const val = row[idx];
+        if (val !== undefined && val !== null && val !== "") {
+          let sir = String(val).trim().toUpperCase();
+          if (sir.startsWith("S")) sir = "S";
+          else if (sir.startsWith("R")) sir = "R";
+          else if (sir.startsWith("I")) sir = "I";
+
+          if (sir === "S" || sir === "I" || sir === "R") {
+            record.ast[abx.code] = sir;
+          }
+        }
+      }
+    });
+
+    return record;
+  };
+
+  const getMappedRecords = () => {
+    return rawData.map((row) => mapRowToRecord(row));
+  };
+
+  const validateRecords = (mapped) => {
+    let validCount = 0;
+    let invalidCount = 0;
+    const errorsList = [];
+
+    mapped.forEach((r, idx) => {
+      const errs = [];
+      if (!r.date) errs.push("Missing Date");
+      if (!r.patientName) errs.push("Missing Name");
+      if (!r.ipdopd) errs.push("Missing IPD/OPD");
+      if (!r.ward) errs.push("Missing Ward");
+      if (!r.sample) errs.push("Missing Sample");
+
+      if (errs.length > 0) {
+        invalidCount++;
+        errorsList.push({ rowNum: idx + 2, name: r.patientName || `Row ${idx + 2}`, errors: errs.join(", ") });
+      } else {
+        validCount++;
+      }
+    });
+
+    return { validCount, invalidCount, errorsList };
+  };
+
+  const handleMappingChange = (field, headerIdx) => {
+    setMapping((prev) => ({
+      ...prev,
+      [field]: headerIdx === "" ? -1 : parseInt(headerIdx, 10),
+    }));
+  };
+
+  const handleNextStep = () => {
+    const required = ["date", "patientName", "ipdopd", "ward", "sample"];
+    const unmapped = required.filter((field) => mapping[field] === undefined || mapping[field] === -1);
+
+    if (unmapped.length > 0) {
+      toast(`Please map required fields: ${unmapped.join(", ")}`, "error");
+      return;
+    }
+
+    setStep(3);
+  };
+
+  const handleImportClick = () => {
+    const mapped = getMappedRecords();
+    const { validCount } = validateRecords(mapped);
+
+    if (validCount === 0) {
+      toast("No valid records to import", "error");
+      return;
+    }
+
+    const validMapped = mapped.filter((r) => r.date && r.patientName && r.ipdopd && r.ward && r.sample);
+
+    const finalRecordsToImport = validMapped.map((r, i) => ({
+      ...r,
+      id: r.id || `${Date.now()}_import_${i}_${Math.random().toString(36).substr(2, 5)}`,
+      createdAt: r.createdAt || new Date().toISOString(),
+    }));
+
+    onImport(finalRecordsToImport, importStrategy);
+  };
+
+  const mappedPreview = getMappedRecords().slice(0, 3);
+  const mappedAll = getMappedRecords();
+  const { validCount, invalidCount, errorsList } = validateRecords(mappedAll);
+
+  const coreFieldsConfig = [
+    { key: "date", label: "Date", req: true },
+    { key: "ipdopd", label: "IPD / OPD No.", req: true },
+    { key: "patientName", label: "Patient Name", req: true },
+    { key: "ward", label: "Ward", req: true },
+    { key: "sample", label: "Sample Type", req: true },
+    { key: "gramStain", label: "Gram Stain Result", req: false },
+    { key: "znStain", label: "ZN Stain", req: false },
+    { key: "koh", label: "KOH", req: false },
+    { key: "organism", label: "Organism Isolated", req: false },
+    { key: "remarks", label: "Remarks / Notes", req: false },
+  ];
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "880px" }}>
+        <div className="modal-hdr">
+          <div className="card-title">
+            <div className="card-ico">📤</div>
+            Import Excel Data {fileName && `— ${fileName}`}
+          </div>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body" style={{ minHeight: "300px" }}>
+          {step === 1 && (
+            <div style={{ padding: "20px 0" }}>
+              <div
+                className="upload-zone"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) processFile(file);
+                }}
+              >
+                <div className="upload-zone-icon">📊</div>
+                <div className="upload-zone-text">Click to upload or drag &amp; drop Excel file here</div>
+                <div className="upload-zone-subtext">Supports .xlsx, .xls formats</div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".xlsx, .xls"
+                  style={{ display: "none" }}
+                />
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--g500)", lineHeight: "1.6" }}>
+                <strong>Tip:</strong> The importer can parse files exported from this system or other Excel layouts.
+                In the next step, you will be able to map custom column headers (like "Name of Patient" or "Date Collected")
+                to our standard register fields.
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="mapping-container">
+              <div className="validation-banner validation-banner-warning" style={{ margin: 0 }}>
+                💡 <strong>Column Mapping:</strong> Map the columns in your Excel file to the register fields. Required fields must be mapped. We have auto-matched columns where possible.
+              </div>
+
+              <div className="mapping-card">
+                <div className="mapping-card-title">Core Patient Information</div>
+                <div className="mapping-grid">
+                  {coreFieldsConfig.map((field) => (
+                    <div key={field.key} className="mapping-field">
+                      <label>
+                        {field.label} {field.req && <span className="req">*</span>}
+                      </label>
+                      <select
+                        value={mapping[field.key] !== undefined && mapping[field.key] !== -1 ? mapping[field.key] : ""}
+                        onChange={(e) => handleMappingChange(field.key, e.target.value)}
+                      >
+                        <option value="">— Skip / Not Present —</option>
+                        {headers.map((hdr, idx) => (
+                          <option key={idx} value={idx}>{hdr} (Col {idx + 1})</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mapping-card" style={{ padding: "0" }}>
+                <button className="accordion-trigger" onClick={() => setAstExpanded(!astExpanded)}>
+                  <span>🧪 Antibiotic Sensitivity Columns (AST) {astExpanded ? "▼" : "▶"}</span>
+                  <span style={{ fontSize: "11px", fontWeight: "normal", color: "var(--g500)" }}>
+                    {ALL_ABX.filter(a => mapping[`ast_${a.code}`] !== undefined && mapping[`ast_${a.code}`] !== -1).length} mapped
+                  </span>
+                </button>
+                {astExpanded && (
+                  <div style={{ padding: "14px", borderTop: "1px solid var(--border)" }}>
+                    <div className="mapping-grid">
+                      {ALL_ABX.map((abx) => (
+                        <div key={abx.code} className="mapping-field">
+                          <label title={abx.name}>{abx.code} ({abx.name.split("/")[0]})</label>
+                          <select
+                            value={mapping[`ast_${abx.code}`] !== undefined && mapping[`ast_${abx.code}`] !== -1 ? mapping[`ast_${abx.code}`] : ""}
+                            onChange={(e) => handleMappingChange(`ast_${abx.code}`, e.target.value)}
+                          >
+                            <option value="">— Skip —</option>
+                            {headers.map((hdr, idx) => (
+                              <option key={idx} value={idx}>{hdr}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {mappedPreview.length > 0 && (
+                <div className="mapping-card">
+                  <div className="mapping-card-title">Live Preview (First {mappedPreview.length} rows)</div>
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>IPD/OPD</th>
+                          <th>Patient Name</th>
+                          <th>Ward</th>
+                          <th>Sample</th>
+                          <th>Organism</th>
+                          <th>ZN</th>
+                          <th>KOH</th>
+                          <th>AST Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mappedPreview.map((r, i) => (
+                          <tr key={i}>
+                            <td>{r.date || <span style={{ color: "var(--danger)" }}>[Invalid/Missing]</span>}</td>
+                            <td>{r.ipdopd || <span style={{ color: "var(--danger)" }}>[Missing]</span>}</td>
+                            <td>{r.patientName || <span style={{ color: "var(--danger)" }}>[Missing]</span>}</td>
+                            <td>{r.ward || <span style={{ color: "var(--danger)" }}>[Missing]</span>}</td>
+                            <td>{r.sample || <span style={{ color: "var(--danger)" }}>[Missing]</span>}</td>
+                            <td>{r.organism || "—"}</td>
+                            <td>{r.znStain || "—"}</td>
+                            <td>{r.koh || "—"}</td>
+                            <td>{Object.keys(r.ast || {}).length}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 3 && (
+            <div>
+              <div className="import-summary-grid">
+                <div className="import-summary-card">
+                  <div className="import-summary-val" style={{ color: "var(--pri)" }}>{mappedAll.length}</div>
+                  <div className="import-summary-lbl">Total Rows Detected</div>
+                </div>
+                <div className="import-summary-card">
+                  <div className="import-summary-val" style={{ color: "var(--success)" }}>{validCount}</div>
+                  <div className="import-summary-lbl">Valid Rows (To Import)</div>
+                </div>
+                <div className="import-summary-card">
+                  <div className="import-summary-val" style={{ color: invalidCount > 0 ? "var(--danger)" : "var(--g500)" }}>{invalidCount}</div>
+                  <div className="import-summary-lbl">Invalid Rows (Skipped)</div>
+                </div>
+              </div>
+
+              {invalidCount > 0 && (
+                <div className="mapping-card" style={{ marginBottom: "16px", borderColor: "var(--danger)" }}>
+                  <div className="mapping-card-title" style={{ color: "var(--danger)", borderBottomColor: "#ffebee" }}>
+                    ⚠️ Validation Issues (Skipped {invalidCount} rows)
+                  </div>
+                  <div style={{ maxHeight: "150px", overflowY: "auto", fontSize: "12px", color: "var(--g700)" }}>
+                    <table style={{ minWidth: "100%" }}>
+                      <thead>
+                        <tr>
+                          <th>Excel Row</th>
+                          <th>Patient Name</th>
+                          <th>Details / Errors</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {errorsList.map((err, i) => (
+                          <tr key={i}>
+                            <td style={{ fontWeight: "bold" }}>Row {err.rowNum}</td>
+                            <td>{err.name}</td>
+                            <td style={{ color: "var(--danger)" }}>{err.errors}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="strategy-select">
+                <div style={{ fontWeight: "700", fontSize: "13px", color: "var(--g900)", marginBottom: "4px" }}>
+                  Select Import Strategy:
+                </div>
+                <div className="strategy-options">
+                  <label className="strategy-option">
+                    <input
+                      type="radio"
+                      name="strategy"
+                      value="merge"
+                      checked={importStrategy === "merge"}
+                      onChange={() => setImportStrategy("merge")}
+                    />
+                    <div>
+                      <strong>Merge &amp; Skip Duplicates (Recommended)</strong>
+                      <div className="strategy-option-desc">
+                        Checks if a record with the same Name, Date, Ward, and IPD/OPD already exists in the system. If it does, it skips it to prevent duplicates.
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="strategy-option">
+                    <input
+                      type="radio"
+                      name="strategy"
+                      value="append"
+                      checked={importStrategy === "append"}
+                      onChange={() => setImportStrategy("append")}
+                    />
+                    <div>
+                      <strong>Append All</strong>
+                      <div className="strategy-option-desc">
+                        Imports all valid records without checking for duplicates.
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="strategy-option">
+                    <input
+                      type="radio"
+                      name="strategy"
+                      value="overwrite"
+                      checked={importStrategy === "overwrite"}
+                      onChange={() => setImportStrategy("overwrite")}
+                    />
+                    <div>
+                      <strong style={{ color: "var(--danger)" }}>Overwrite Register</strong>
+                      <div className="strategy-option-desc">
+                        Deletes ALL current records and replaces them entirely with the valid records in this spreadsheet.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {validCount > 0 ? (
+                <div className="validation-banner validation-banner-success" style={{ margin: 0 }}>
+                  ✅ Ready to import <strong>{validCount}</strong> records into the laboratory register.
+                </div>
+              ) : (
+                <div className="validation-banner validation-banner-warning" style={{ margin: 0, color: "var(--danger)", borderColor: "#ffebee", background: "#fdf2f2" }}>
+                  ❌ No valid records found in this file with the current column mappings.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-ftr">
+          {step === 2 && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setStep(1)}>🔙 Back to Upload</button>
+          )}
+          {step === 3 && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setStep(2)}>✏️ Edit Mapping</button>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+
+          {step === 2 && (
+            <button className="btn btn-primary btn-sm" onClick={handleNextStep}>Preview &amp; Validate ➡️</button>
+          )}
+          {step === 3 && validCount > 0 && (
+            <button className="btn btn-success btn-sm" onClick={handleImportClick}>
+              📥 Confirm Import ({validCount} Records)
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -753,7 +1528,7 @@ const EntryPane = ({ onSave, editingRecord, onCancelEdit, toast }) => {
 };
 
 // ── RECORDS PANE ─────────────────────────────────────────────────────────────
-const RecordsPane = ({ records, onView, onEdit, onExport }) => {
+const RecordsPane = ({ records, onView, onEdit, onExport, onImportClick, onDelete }) => {
   const [search, setSearch] = useState("");
   const [filterWard, setFilterWard] = useState("");
   const [filterSample, setFilterSample] = useState("");
@@ -788,7 +1563,10 @@ const RecordsPane = ({ records, onView, onEdit, onExport }) => {
       <div className="card">
         <div className="card-hdr">
           <div className="card-title"><div className="card-ico">📋</div> Patient Records</div>
-          <button className="btn btn-success btn-sm" onClick={onExport}>📥 Export</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-outline btn-sm" onClick={onImportClick}>📤 Import</button>
+            <button className="btn btn-success btn-sm" onClick={onExport}>📥 Export</button>
+          </div>
         </div>
 
         <div className="search-bar">
@@ -839,6 +1617,7 @@ const RecordsPane = ({ records, onView, onEdit, onExport }) => {
                   <td style={{ whiteSpace: "nowrap" }}>
                     <button className="btn btn-outline btn-sm" onClick={() => onView(r.id)}>👁️ View</button>
                     <button className="btn btn-sm" style={{ background: "#E3F2FD", color: "#1565C0", border: "none", marginLeft: 4 }} onClick={() => onEdit(r.id)}>✏️</button>
+                    <button className="btn btn-sm" style={{ background: "var(--danger-light)", color: "var(--danger)", border: "none", marginLeft: 4 }} onClick={() => onDelete(r.id)} title="Delete Record">🗑️</button>
                   </td>
                 </tr>
               ))}
@@ -866,6 +1645,7 @@ const RecordsPane = ({ records, onView, onEdit, onExport }) => {
               <div className="mob-card-actions">
                 <button className="btn btn-outline btn-sm" onClick={() => onView(r.id)}>👁️ View</button>
                 <button className="btn btn-ghost btn-sm" onClick={() => onEdit(r.id)}>✏️ Edit</button>
+                <button className="btn btn-danger btn-sm" style={{ padding: "6px 9px", minHeight: "auto" }} onClick={() => onDelete(r.id)}>🗑️</button>
               </div>
             </div>
           ))}
@@ -1072,6 +1852,7 @@ export default function App() {
   const [records, setRecords] = useState(loadRecords);
   const [viewId, setViewId] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const { toasts, toast } = useToasts();
   const styleInjected = useRef(false);
 
@@ -1144,6 +1925,42 @@ export default function App() {
     toast("Record deleted", "error");
   };
 
+  const handleImport = (importedRecords, strategy) => {
+    setRecords((prev) => {
+      if (strategy === "overwrite") {
+        toast(`Imported ${importedRecords.length} records, overwriting current list`, "success");
+        return importedRecords;
+      }
+
+      if (strategy === "merge") {
+        let duplicates = 0;
+        const filtered = importedRecords.filter((newRec) => {
+          const isDuplicate = prev.some((oldRec) => {
+            return (
+              (oldRec.patientName || "").toLowerCase().trim() === (newRec.patientName || "").toLowerCase().trim() &&
+              (oldRec.date || "").trim() === (newRec.date || "").trim() &&
+              (oldRec.ward || "").toLowerCase().trim() === (newRec.ward || "").toLowerCase().trim() &&
+              (oldRec.ipdopd || "").toLowerCase().trim() === (newRec.ipdopd || "").toLowerCase().trim()
+            );
+          });
+          if (isDuplicate) duplicates++;
+          return !isDuplicate;
+        });
+
+        if (duplicates > 0) {
+          toast(`Merged ${filtered.length} records. Skipped ${duplicates} duplicates.`, "info");
+        } else {
+          toast(`Successfully imported ${filtered.length} records.`, "success");
+        }
+        return [...prev, ...filtered];
+      }
+
+      toast(`Successfully imported ${importedRecords.length} records.`, "success");
+      return [...prev, ...importedRecords];
+    });
+    setImportModalOpen(false);
+  };
+
   const viewRecord = records.find((r) => r.id === viewId);
 
   useEffect(() => {
@@ -1170,7 +1987,6 @@ export default function App() {
                 type="text"
                 value={username}
                 onChange={(e) => { setUsername(e.target.value); setLoginError(""); }}
-                // placeholder="e.g. DV1404"
                 className={loginError ? "input-err" : ""}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
@@ -1182,7 +1998,6 @@ export default function App() {
                 type="password"
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setLoginError(""); }}
-                // placeholder="••••"
                 className={loginError ? "input-err" : ""}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
@@ -1215,6 +2030,7 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
+          <button className="hdr-btn" onClick={() => setImportModalOpen(true)} title="Import from Excel">📤</button>
           <button className="hdr-btn" onClick={() => exportExcel(records, toast)} title="Export to Excel">📥</button>
           <button className="hdr-btn" style={{ background: "rgba(198,40,40,0.18)", borderColor: "rgba(198,40,40,0.35)" }} onClick={handleLogout} title="Logout">🚪</button>
         </div>
@@ -1245,6 +2061,8 @@ export default function App() {
             onView={setViewId}
             onEdit={handleEdit}
             onExport={() => exportExcel(records, toast)}
+            onImportClick={() => setImportModalOpen(true)}
+            onDelete={handleDelete}
           />
         )}
         {tab === "report" && <ReportPane records={records} />}
@@ -1257,6 +2075,16 @@ export default function App() {
           onClose={() => setViewId(null)}
           onEdit={handleEdit}
           onDelete={handleDelete}
+        />
+      )}
+
+      {/* IMPORT MODAL */}
+      {importModalOpen && (
+        <ImportModal
+          onClose={() => setImportModalOpen(false)}
+          onImport={handleImport}
+          currentRecords={records}
+          toast={toast}
         />
       )}
 

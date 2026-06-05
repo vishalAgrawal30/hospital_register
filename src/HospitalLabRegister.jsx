@@ -795,21 +795,26 @@ const autoMapColumns = (headers) => {
   });
 
   ALL_ABX.forEach((abx) => {
-    const codeLower = abx.code.toLowerCase();
-    const nameLower = abx.name.toLowerCase();
+  const codeLower = abx.code.toLowerCase();
 
-    const idx = lowerHeaders.findIndex(h => {
-      return h === codeLower ||
-        h.startsWith(codeLower + "\n") ||
-        h.startsWith(codeLower + " ") ||
-        h.includes(`(${codeLower})`) ||
-        h.includes(nameLower);
-    });
+  const idx = lowerHeaders.findIndex((h) => {
+    const normalized = h
+      .replace(/\n/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
 
-    if (idx !== -1) {
-      mapping[`ast_${abx.code}`] = idx;
-    }
+    return (
+      normalized.startsWith(codeLower) ||
+      normalized.includes(`(${codeLower})`) ||
+      normalized.includes(abx.name.toLowerCase())
+    );
   });
+
+  if (idx !== -1) {
+    mapping[`ast_${abx.code}`] = idx;
+  }
+});
 
   return mapping;
 };
@@ -842,9 +847,20 @@ const ImportModal = ({ onClose, onImport, currentRecords, toast }) => {
           toast("Excel file has no sheets", "error");
           return;
         }
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
+        // const sheetName = workbook.SheetNames[0];
+        // const worksheet = workbook.Sheets[sheetName];
+// Always use "All Records" sheet
+const sheetName = workbook.SheetNames.find(
+  (name) => name.trim().toLowerCase() === "all records"
+);
 
+if (!sheetName) {
+  toast('Sheet "All Records" not found', "error");
+  return;
+}
+console.log("Available Sheets:", workbook.SheetNames);
+console.log("Selected Sheet:", sheetName);
+const worksheet = workbook.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
         if (rows.length === 0) {
           toast("Selected sheet is empty", "error");

@@ -523,6 +523,101 @@ const CSS = `
     font-size: 11px;
     color: var(--g500);
   }
+
+  /* LOADER OVERLAY */
+  .loader-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(6px);
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-family: var(--font);
+    animation: fadeIn 0.3s ease;
+  }
+  
+  .loader-card {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--rad-lg);
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--shadow-md);
+    max-width: 320px;
+    width: 90%;
+    text-align: center;
+    backdrop-filter: blur(12px);
+  }
+
+  .loader-spinner {
+    position: relative;
+    width: 60px;
+    height: 60px;
+  }
+
+  .loader-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 4px solid transparent;
+    border-top-color: var(--pri-light);
+    border-radius: 50%;
+    animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  }
+
+  .loader-ring:nth-child(2) {
+    border-top-color: #2196F3;
+    animation-delay: -0.3s;
+  }
+
+  .loader-ring:nth-child(3) {
+    border-top-color: #0D47A1;
+    animation-delay: -0.6s;
+  }
+
+  .loader-inner-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .loader-title {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-top: 8px;
+  }
+
+  .loader-desc {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(0.9); opacity: 0.7; }
+    50% { transform: scale(1.1); opacity: 1; }
+  }
   `;
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -820,7 +915,7 @@ const autoMapColumns = (headers) => {
 };
 
 // ── IMPORT MODAL ──────────────────────────────────────────────────────────────
-const ImportModal = ({ onClose, onImport, currentRecords, toast }) => {
+const ImportModal = ({ onClose, onImport, currentRecords, toast, setLoading }) => {
   const [step, setStep] = useState(1); // 1: Upload, 2: Map, 3: Preview
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState([]);
@@ -838,73 +933,92 @@ const ImportModal = ({ onClose, onImport, currentRecords, toast }) => {
 
   const processFile = (file) => {
     setFileName(file.name);
+    if (setLoading) {
+      setLoading({
+        active: true,
+        title: "Analyzing Excel",
+        desc: "Reading spreadsheet columns and values...",
+        icon: "📊"
+      });
+    }
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array", cellDates: true });
-        if (workbook.SheetNames.length === 0) {
-          toast("Excel file has no sheets", "error");
-          return;
-        }
-        // const sheetName = workbook.SheetNames[0];
-        // const worksheet = workbook.Sheets[sheetName];
-// Always use "All Records" sheet
-const sheetName = workbook.SheetNames.find(
-  (name) => name.trim().toLowerCase() === "all records"
-);
+        setTimeout(() => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: "array", cellDates: true });
+            if (workbook.SheetNames.length === 0) {
+              toast("Excel file has no sheets", "error");
+              if (setLoading) setLoading({ active: false, title: "", desc: "", icon: "🔬" });
+              return;
+            }
+            // Always use "All Records" sheet
+            const sheetName = workbook.SheetNames.find(
+              (name) => name.trim().toLowerCase() === "all records"
+            );
 
-if (!sheetName) {
-  toast('Sheet "All Records" not found', "error");
-  return;
-}
-console.log("Available Sheets:", workbook.SheetNames);
-console.log("Selected Sheet:", sheetName);
-const worksheet = workbook.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
-        if (rows.length === 0) {
-          toast("Selected sheet is empty", "error");
-          return;
-        }
+            if (!sheetName) {
+              toast('Sheet "All Records" not found', "error");
+              if (setLoading) setLoading({ active: false, title: "", desc: "", icon: "🔬" });
+              return;
+            }
+            console.log("Available Sheets:", workbook.SheetNames);
+            console.log("Selected Sheet:", sheetName);
+            const worksheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+            if (rows.length === 0) {
+              toast("Selected sheet is empty", "error");
+              if (setLoading) setLoading({ active: false, title: "", desc: "", icon: "🔬" });
+              return;
+            }
 
-        // Find the actual header row (skip empty rows and titles)
-        let headerRowIdx = 0;
-        const coreKeywords = ["date", "name", "ward", "patient", "ipd", "opd", "sample", "specimen"];
-        for (let i = 0; i < Math.min(rows.length, 15); i++) {
-          const row = rows[i] || [];
-          const hasKeyword = row.some((cell) => {
-            const str = String(cell || "").toLowerCase();
-            return coreKeywords.some(kw => str.includes(kw));
-          });
-          if (hasKeyword) {
-            headerRowIdx = i;
-            break;
+            // Find the actual header row (skip empty rows and titles)
+            let headerRowIdx = 0;
+            const coreKeywords = ["date", "name", "ward", "patient", "ipd", "opd", "sample", "specimen"];
+            for (let i = 0; i < Math.min(rows.length, 15); i++) {
+              const row = rows[i] || [];
+              const hasKeyword = row.some((cell) => {
+                const str = String(cell || "").toLowerCase();
+                return coreKeywords.some(kw => str.includes(kw));
+              });
+              if (hasKeyword) {
+                headerRowIdx = i;
+                break;
+              }
+              const populatedCount = row.filter(cell => cell !== undefined && cell !== null && String(cell).trim() !== "").length;
+              if (populatedCount >= 3) {
+                headerRowIdx = i;
+                break;
+              }
+            }
+
+            const sheetHeaders = rows[headerRowIdx].map((h) => String(h || "").trim());
+
+            // Extract raw data and filter out completely empty rows
+            const rawSheetData = rows.slice(headerRowIdx + 1);
+            const sheetData = rawSheetData.filter((row) => {
+              return row.some((cell) => cell !== undefined && cell !== null && String(cell).trim() !== "");
+            });
+
+            setHeaders(sheetHeaders);
+            setRawData(sheetData);
+
+            const autoMap = autoMapColumns(sheetHeaders);
+            setMapping(autoMap);
+
+            setStep(2);
+          } catch (err) {
+            console.error(err);
+            toast("Failed to parse Excel file", "error");
+          } finally {
+            if (setLoading) setLoading({ active: false, title: "", desc: "", icon: "🔬" });
           }
-          const populatedCount = row.filter(cell => cell !== undefined && cell !== null && String(cell).trim() !== "").length;
-          if (populatedCount >= 3) {
-            headerRowIdx = i;
-            break;
-          }
-        }
-
-        const sheetHeaders = rows[headerRowIdx].map((h) => String(h || "").trim());
-
-        // Extract raw data and filter out completely empty rows
-        const rawSheetData = rows.slice(headerRowIdx + 1);
-        const sheetData = rawSheetData.filter((row) => {
-          return row.some((cell) => cell !== undefined && cell !== null && String(cell).trim() !== "");
-        });
-
-        setHeaders(sheetHeaders);
-        setRawData(sheetData);
-
-        const autoMap = autoMapColumns(sheetHeaders);
-        setMapping(autoMap);
-
-        setStep(2);
+        }, 800);
       } catch (err) {
         console.error(err);
         toast("Failed to parse Excel file", "error");
+        if (setLoading) setLoading({ active: false, title: "", desc: "", icon: "🔬" });
       }
     };
     reader.readAsArrayBuffer(file);
@@ -1012,7 +1126,19 @@ const worksheet = workbook.Sheets[sheetName];
       createdAt: r.createdAt || new Date().toISOString(),
     }));
 
-    onImport(finalRecordsToImport, importStrategy);
+    if (setLoading) {
+      setLoading({
+        active: true,
+        title: "Importing Records",
+        desc: `Merging ${validCount} entries into register...`,
+        icon: "📤"
+      });
+    }
+
+    setTimeout(() => {
+      onImport(finalRecordsToImport, importStrategy);
+      if (setLoading) setLoading({ active: false, title: "", desc: "", icon: "🔬" });
+    }, 1200);
   };
 
   const mappedPreview = getMappedRecords().slice(0, 3);
@@ -1722,145 +1848,174 @@ const ReportPane = ({ records }) => {
 };
 
 // ── EXCEL EXPORT ──────────────────────────────────────────────────────────────
-function exportExcel(records, toast) {
+function exportExcel(records, toast, setLoading) {
   if (!records.length) { toast("No records to export", "error"); return; }
 
-  const wb = XLSX.utils.book_new();
-  const abxCodes = ALL_ABX.map((a) => a.code);
-  const abxNames = ALL_ABX.map((a) => a.name);
-
-  // Row 1: main title (merged across all columns)
-  // Row 2: section sub-headers (Patient Info | Microbiology | Antibiotic Sensitivity Testing | )
-  // Row 3: column headers
-  const totalCols = 9 + abxCodes.length + 1; // 9 fixed + abx + remarks
-
-  const makeRow = (r) => [
-    r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "",
-    r.ipdopd || "", r.patientName || "", r.ward || "", r.sample || "",
-    r.gramStain || "", r.znStain || "", r.koh || "", r.organism || "",
-    ...abxCodes.map((code) => {
-      const v = (r.ast || {})[code];
-      if (!v) return "";
-      return typeof v === "object" ? (v.sir || "") : v;
-    }),
-    r.remarks || "",
-  ];
-
-  // Section sub-header row (row 2)
-  // const sectionRow = [
-  //   "Patient Information", "", "", "", "",          // cols 0-4 (Date, IPD, Name, Ward, Sample)
-  //   "Microbiology", "", "", "",                     // cols 5-8 (Gram, ZN, KOH, Organism)
-  //   ...abxCodes.map(() => "Antibiotic Sensitivity Testing (S / I / R)").map((v, i) => i === 0 ? v : ""), // first abx col has label, rest blank
-  //   "Remarks",
-  // ];
-
-  // Column header row (row 3)
-  const colHdrs = [
-    "Date", "IPD / OPD No.", "Patient Name", "Ward", "Sample Type",
-    "Gram Stain Result", "ZN Stain", "KOH", "Organism Isolated",
-    ...abxCodes.map((code, i) => `${code}\n(${abxNames[i]})`),
-    "Remarks / Notes",
-  ];
-
-  const colWidths = [
-    { wch: 13 }, { wch: 12 }, { wch: 26 }, { wch: 10 }, { wch: 16 },
-    { wch: 38 }, { wch: 18 }, { wch: 26 }, { wch: 28 },
-    ...abxCodes.map(() => ({ wch: 14 })),
-    { wch: 28 },
-  ];
-
-  const buildSheet = (recs, sheetTitle) => {
-    const sortedRecs = [...recs].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-    const dataRows = sortedRecs.map(makeRow);
-    const aoa = [
-      colHdrs,                                             // Row 1: Column Headers
-      Array(totalCols).fill(""),                           // Row 2: Empty Row
-      ...dataRows,
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = colWidths;
-
-    // Style: column header row (row 1, index 0 - set background to black)
-    for (let c = 0; c < totalCols; c++) {
-      const ref = XLSX.utils.encode_cell({ r: 0, c });
-      if (!ws[ref]) ws[ref] = { v: "" };
-      ws[ref].s = {
-        font: { bold: true, sz: 9, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: "000000" } }, // Black background
-        alignment: { horizontal: "center", vertical: "center", wrapText: true },
-        border: {
-          top: { style: "thin", color: { rgb: "455A64" } },
-          bottom: { style: "medium", color: { rgb: "90A4AE" } },
-        },
-      };
-    }
-
-    // Style data rows: alternate row shading + SIR color coding
-    dataRows.forEach((row, rowIdx) => {
-      const r = rowIdx + 2; // offset by 2 header rows (Row 0, Row 1)
-      const isAlt = rowIdx % 2 === 1;
-      for (let c = 0; c < totalCols; c++) {
-        const ref = XLSX.utils.encode_cell({ r, c });
-        if (!ws[ref]) ws[ref] = { v: "" };
-        const isAbxCol = c >= 9 && c < 9 + abxCodes.length;
-        const sirVal = isAbxCol ? (row[c] || "") : "";
-        let fillColor = isAlt ? "F5F8FF" : "FFFFFF";
-        let fontColor = "202124";
-        let bold = false;
-        if (isAbxCol && sirVal) {
-          if (sirVal === "S") { fillColor = "E8F5E9"; fontColor = "1B5E20"; bold = true; }
-          else if (sirVal === "R") { fillColor = "FFEBEE"; fontColor = "B71C1C"; bold = true; }
-          else if (sirVal === "I") { fillColor = "FFF3E0"; fontColor = "E65100"; bold = true; }
-        }
-        ws[ref].s = {
-          font: { sz: 10, color: { rgb: fontColor }, bold },
-          fill: { fgColor: { rgb: fillColor } },
-          alignment: { vertical: "center", wrapText: c === 5 },
-          border: {
-            bottom: { style: "thin", color: { rgb: "E8EAED" } },
-            right: { style: "thin", color: { rgb: "E8EAED" } },
-          },
-        };
-      }
+  if (setLoading) {
+    setLoading({
+      active: true,
+      title: "Generating Excel",
+      desc: "Compiling monthly sheets and AST color codes...",
+      icon: "📥"
     });
+  }
 
-    ws["!rows"] = [{ hpt: 36 }, { hpt: 20 }, ...dataRows.map(() => ({ hpt: 18 }))];
-    return ws;
-  };
+  setTimeout(() => {
+    try {
+      const wb = XLSX.utils.book_new();
+      const abxCodes = ALL_ABX.map((a) => a.code);
+      const abxNames = ALL_ABX.map((a) => a.name);
 
-  // Group records by month
-  const byMonth = {};
-  records.forEach((r) => {
-    const m = r.date ? r.date.slice(0, 7) : "Unknown";
-    if (!byMonth[m]) byMonth[m] = [];
-    byMonth[m].push(r);
-  });
+      // Row 1: main title (merged across all columns)
+      // Row 2: section sub-headers (Patient Info | Microbiology | Antibiotic Sensitivity Testing | )
+      // Row 3: column headers
+      const totalCols = 9 + abxCodes.length + 1; // 9 fixed + abx + remarks
 
-  // Add one sheet per month — sheet name: "January 2025", "February 2025" etc.
-  Object.entries(byMonth).sort().forEach(([month, recs]) => {
-    let sheetName, sheetTitle;
-    if (month === "Unknown") {
-      sheetName = "Unknown";
-      sheetTitle = "Hospital Laboratory Register — Unknown Date";
-    } else {
-      const d = new Date(month + "-01");
-      const monthFull = d.toLocaleDateString("en-IN", { month: "long" });
-      const year = d.getFullYear();
-      sheetName = `${monthFull} ${year}`;                    // e.g. "January 2025"
-      sheetTitle = `Hospital Laboratory Register — ${monthFull} ${year}`;
+      const makeRow = (r) => [
+        r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "",
+        r.ipdopd || "", r.patientName || "", r.ward || "", r.sample || "",
+        r.gramStain || "", r.znStain || "", r.koh || "", r.organism || "",
+        ...abxCodes.map((code) => {
+          const v = (r.ast || {})[code];
+          if (!v) return "";
+          return typeof v === "object" ? (v.sir || "") : v;
+        }),
+        r.remarks || "",
+      ];
+
+      // Column header row (row 3)
+      const colHdrs = [
+        "Date", "IPD / OPD No.", "Patient Name", "Ward", "Sample Type",
+        "Gram Stain Result", "ZN Stain", "KOH", "Organism Isolated",
+        ...abxCodes.map((code, i) => `${code}\n(${abxNames[i]})`),
+        "Remarks / Notes",
+      ];
+
+      const colWidths = [
+        { wch: 13 }, { wch: 12 }, { wch: 26 }, { wch: 10 }, { wch: 16 },
+        { wch: 38 }, { wch: 18 }, { wch: 26 }, { wch: 28 },
+        ...abxCodes.map(() => ({ wch: 14 })),
+        { wch: 28 },
+      ];
+
+      const buildSheet = (recs, sheetTitle) => {
+        const sortedRecs = [...recs].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+        const dataRows = sortedRecs.map(makeRow);
+        const aoa = [
+          colHdrs,                                             // Row 1: Column Headers
+          Array(totalCols).fill(""),                           // Row 2: Empty Row
+          ...dataRows,
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws["!cols"] = colWidths;
+
+        // Style: column header row (row 1, index 0 - set background to black)
+        for (let c = 0; c < totalCols; c++) {
+          const ref = XLSX.utils.encode_cell({ r: 0, c });
+          if (!ws[ref]) ws[ref] = { v: "" };
+          ws[ref].s = {
+            font: { bold: true, sz: 9, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "000000" } }, // Black background
+            alignment: { horizontal: "center", vertical: "center", wrapText: true },
+            border: {
+              top: { style: "thin", color: { rgb: "455A64" } },
+              bottom: { style: "medium", color: { rgb: "90A4AE" } },
+            },
+          };
+        }
+
+        // Style data rows: alternate row shading + SIR color coding
+        dataRows.forEach((row, rowIdx) => {
+          const r = rowIdx + 2; // offset by 2 header rows (Row 0, Row 1)
+          const isAlt = rowIdx % 2 === 1;
+          for (let c = 0; c < totalCols; c++) {
+            const ref = XLSX.utils.encode_cell({ r, c });
+            if (!ws[ref]) ws[ref] = { v: "" };
+            const isAbxCol = c >= 9 && c < 9 + abxCodes.length;
+            const sirVal = isAbxCol ? (row[c] || "") : "";
+            let fillColor = isAlt ? "F5F8FF" : "FFFFFF";
+            let fontColor = "202124";
+            let bold = false;
+            if (isAbxCol && sirVal) {
+              if (sirVal === "S") { fillColor = "E8F5E9"; fontColor = "1B5E20"; bold = true; }
+              else if (sirVal === "R") { fillColor = "FFEBEE"; fontColor = "B71C1C"; bold = true; }
+              else if (sirVal === "I") { fillColor = "FFF3E0"; fontColor = "E65100"; bold = true; }
+            }
+            ws[ref].s = {
+              font: { sz: 10, color: { rgb: fontColor }, bold },
+              fill: { fgColor: { rgb: fillColor } },
+              alignment: { vertical: "center", wrapText: c === 5 },
+              border: {
+                bottom: { style: "thin", color: { rgb: "E8EAED" } },
+                right: { style: "thin", color: { rgb: "E8EAED" } },
+              },
+            };
+          }
+        });
+
+        ws["!rows"] = [{ hpt: 36 }, { hpt: 20 }, ...dataRows.map(() => ({ hpt: 18 }))];
+        return ws;
+      };
+
+      // Group records by month
+      const byMonth = {};
+      records.forEach((r) => {
+        const m = r.date ? r.date.slice(0, 7) : "Unknown";
+        if (!byMonth[m]) byMonth[m] = [];
+        byMonth[m].push(r);
+      });
+
+      // Add one sheet per month — sheet name: "January 2025", "February 2025" etc.
+      Object.entries(byMonth).sort().forEach(([month, recs]) => {
+        let sheetName, sheetTitle;
+        if (month === "Unknown") {
+          sheetName = "Unknown";
+          sheetTitle = "Hospital Laboratory Register — Unknown Date";
+        } else {
+          const d = new Date(month + "-01");
+          const monthFull = d.toLocaleDateString("en-IN", { month: "long" });
+          const year = d.getFullYear();
+          sheetName = `${monthFull} ${year}`;                    // e.g. "January 2025"
+          sheetTitle = `Hospital Laboratory Register — ${monthFull} ${year}`;
+        }
+        const ws = buildSheet(recs, sheetTitle);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      });
+
+      // Summary "All Records" sheet
+      const allTitle = `Hospital Laboratory Register — All Records (Exported ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })})`;
+      const wsAll = buildSheet(records, allTitle);
+      XLSX.utils.book_append_sheet(wb, wsAll, "All Records");
+
+      XLSX.writeFile(wb, `Lab_Register_${todayStr()}.xlsx`);
+      toast("Excel exported successfully 📥", "success");
+    } catch (err) {
+      console.error(err);
+      toast("Failed to export Excel", "error");
+    } finally {
+      if (setLoading) setLoading({ active: false, title: "", desc: "", icon: "🔬" });
     }
-    const ws = buildSheet(recs, sheetTitle);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  });
-
-  // Summary "All Records" sheet
-  const allTitle = `Hospital Laboratory Register — All Records (Exported ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })})`;
-  const wsAll = buildSheet(records, allTitle);
-  XLSX.utils.book_append_sheet(wb, wsAll, "All Records");
-
-  XLSX.writeFile(wb, `Lab_Register_${todayStr()}.xlsx`);
-  toast("Excel exported successfully 📥", "success");
+  }, 1000);
 }
+
+// ── LOADER OVERLAY COMPONENT ─────────────────────────────────────────────────
+const LoaderOverlay = ({ active, title, desc, icon }) => {
+  if (!active) return null;
+  return (
+    <div className="loader-overlay">
+      <div className="loader-card">
+        <div className="loader-spinner">
+          <div className="loader-ring"></div>
+          <div className="loader-ring"></div>
+          <div className="loader-ring"></div>
+          <div className="loader-inner-icon">{icon}</div>
+        </div>
+        <div className="loader-title">{title}</div>
+        <div className="loader-desc">{desc}</div>
+      </div>
+    </div>
+  );
+};
 
 // ── APP ───────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -1871,6 +2026,8 @@ export default function App() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const { toasts, toast } = useToasts();
   const styleInjected = useRef(false);
+  const [loading, setLoading] = useState({ active: false, title: "", desc: "", icon: "🔬" });
+  const initialLoadRef = useRef(true);
 
   // Authentication State
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -1882,9 +2039,19 @@ export default function App() {
 
   const handleLogin = () => {
     if (username === "DV1404" && password === "1430") {
-      setIsLoggedIn(true);
-      localStorage.setItem("isLoggedIn", "true");
+      setLoading({
+        active: true,
+        title: "Authenticating",
+        desc: "Establishing secure portal session...",
+        icon: "🔑"
+      });
       setLoginError("");
+      setTimeout(() => {
+        initialLoadRef.current = false;
+        setIsLoggedIn(true);
+        localStorage.setItem("isLoggedIn", "true");
+        setLoading({ active: false, title: "", desc: "", icon: "🔬" });
+      }, 1000);
     } else {
       setLoginError("Invalid username or password");
     }
@@ -1910,19 +2077,45 @@ export default function App() {
 
   useEffect(() => { saveRecords(records); }, [records]);
 
+  useEffect(() => {
+    if (isLoggedIn && initialLoadRef.current) {
+      initialLoadRef.current = false;
+      setLoading({
+        active: true,
+        title: "Loading Database",
+        desc: "Retrieving patient register entries...",
+        icon: "🗂️"
+      });
+      const timer = setTimeout(() => {
+        setLoading({ active: false, title: "", desc: "", icon: "🔬" });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoggedIn]);
+
   const handleSave = (data) => {
-    setRecords((prev) => {
-      const idx = prev.findIndex((r) => r.id === data.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], ...data, updatedAt: new Date().toISOString() };
-        toast("Record updated ✓", "success");
-        return next;
-      }
-      toast("Entry saved! 🎉", "success");
-      return [...prev, { ...data, createdAt: new Date().toISOString() }];
+    const isEditing = records.some((r) => r.id === data.id);
+    setLoading({
+      active: true,
+      title: isEditing ? "Updating Record" : "Saving Record",
+      desc: isEditing ? "Applying changes to patient record..." : "Writing entry to database...",
+      icon: isEditing ? "✏️" : "💾"
     });
-    setEditingRecord(null);
+    setTimeout(() => {
+      setRecords((prev) => {
+        const idx = prev.findIndex((r) => r.id === data.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...data, updatedAt: new Date().toISOString() };
+          toast("Record updated ✓", "success");
+          return next;
+        }
+        toast("Entry saved! 🎉", "success");
+        return [...prev, { ...data, createdAt: new Date().toISOString() }];
+      });
+      setEditingRecord(null);
+      setLoading({ active: false, title: "", desc: "", icon: "🔬" });
+    }, 800);
   };
 
   const handleEdit = (id) => {
@@ -1936,9 +2129,18 @@ export default function App() {
 
   const handleDelete = (id) => {
     if (!window.confirm("Delete this record permanently?")) return;
-    setRecords((prev) => prev.filter((r) => r.id !== id));
-    setViewId(null);
-    toast("Record deleted", "error");
+    setLoading({
+      active: true,
+      title: "Deleting Record",
+      desc: "Removing entry from register...",
+      icon: "🗑️"
+    });
+    setTimeout(() => {
+      setRecords((prev) => prev.filter((r) => r.id !== id));
+      setViewId(null);
+      toast("Record deleted", "error");
+      setLoading({ active: false, title: "", desc: "", icon: "🔬" });
+    }, 800);
   };
 
   const handleImport = (importedRecords, strategy) => {
@@ -1990,52 +2192,56 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="login-overlay">
-        <div className="login-card">
-          <div className="login-logo">🔬</div>
-          <h2 className="login-title">Hospital Lab Portal</h2>
-          <p className="login-subtitle">Enter your credentials to access the register</p>
+      <>
+        <LoaderOverlay active={loading.active} title={loading.title} desc={loading.desc} icon={loading.icon} />
+        <div className="login-overlay">
+          <div className="login-card">
+            <div className="login-logo">🔬</div>
+            <h2 className="login-title">Hospital Lab Portal</h2>
+            <p className="login-subtitle">Enter your credentials to access the register</p>
 
-          <div className="login-form">
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <label className="field-lbl">Username</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => { setUsername(e.target.value); setLoginError(""); }}
-                className={loginError ? "input-err" : ""}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 20 }}>
-              <label className="field-lbl">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setLoginError(""); }}
-                className={loginError ? "input-err" : ""}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              />
-            </div>
-
-            {loginError && (
-              <div className="login-error">
-                ⚠️ {loginError}
+            <div className="login-form">
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="field-lbl">Username</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => { setUsername(e.target.value); setLoginError(""); }}
+                  className={loginError ? "input-err" : ""}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                />
               </div>
-            )}
 
-            <button className="btn btn-primary btn-lg" style={{ width: "100%", justifyContent: "center", marginTop: 8 }} onClick={handleLogin}>
-              🔑 Secure Login
-            </button>
+              <div className="form-group" style={{ marginBottom: 20 }}>
+                <label className="field-lbl">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setLoginError(""); }}
+                  className={loginError ? "input-err" : ""}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                />
+              </div>
+
+              {loginError && (
+                <div className="login-error">
+                  ⚠️ {loginError}
+                </div>
+              )}
+
+              <button className="btn btn-primary btn-lg" style={{ width: "100%", justifyContent: "center", marginTop: 8 }} onClick={handleLogin}>
+                🔑 Secure Login
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
     <>
+      <LoaderOverlay active={loading.active} title={loading.title} desc={loading.desc} icon={loading.icon} />
       {/* HEADER */}
       <header className="hdr">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2047,11 +2253,11 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button className="hdr-btn" onClick={() => setImportModalOpen(true)} title="Import from Excel">📤</button>
-          <button className="hdr-btn" onClick={() => exportExcel(records, toast)} title="Export to Excel">📥</button>
+          <button className="hdr-btn" onClick={() => exportExcel(records, toast, setLoading)} title="Export to Excel">📥</button>
           <button className="hdr-btn" style={{ background: "rgba(198,40,40,0.18)", borderColor: "rgba(198,40,40,0.35)" }} onClick={handleLogout} title="Logout">🚪</button>
         </div>
       </header>
-
+ 
       {/* TABS */}
       <div className="tabs">
         <button className={`tab${tab === "entry" ? " active" : ""}`} onClick={() => setTab("entry")}>✏️ New Entry</button>
@@ -2060,7 +2266,7 @@ export default function App() {
         </button>
         <button className={`tab${tab === "report" ? " active" : ""}`} onClick={() => setTab("report")}>📊 Summary</button>
       </div>
-
+ 
       {/* MAIN */}
       <div className="main">
         {tab === "entry" && (
@@ -2076,14 +2282,14 @@ export default function App() {
             records={records}
             onView={setViewId}
             onEdit={handleEdit}
-            onExport={() => exportExcel(records, toast)}
+            onExport={() => exportExcel(records, toast, setLoading)}
             onImportClick={() => setImportModalOpen(true)}
             onDelete={handleDelete}
           />
         )}
         {tab === "report" && <ReportPane records={records} />}
       </div>
-
+ 
       {/* MODAL */}
       {viewId && (
         <ViewModal
@@ -2093,7 +2299,7 @@ export default function App() {
           onDelete={handleDelete}
         />
       )}
-
+ 
       {/* IMPORT MODAL */}
       {importModalOpen && (
         <ImportModal
@@ -2101,9 +2307,10 @@ export default function App() {
           onImport={handleImport}
           currentRecords={records}
           toast={toast}
+          setLoading={setLoading}
         />
       )}
-
+ 
       {/* TOASTS */}
       <div className="toast-con">
         {toasts.map((t) => (

@@ -890,26 +890,26 @@ const autoMapColumns = (headers) => {
   });
 
   ALL_ABX.forEach((abx) => {
-  const codeLower = abx.code.toLowerCase();
+    const codeLower = abx.code.toLowerCase();
 
-  const idx = lowerHeaders.findIndex((h) => {
-    const normalized = h
-      .replace(/\n/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase();
+    const idx = lowerHeaders.findIndex((h) => {
+      const normalized = h
+        .replace(/\n/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
 
-    return (
-      normalized.startsWith(codeLower) ||
-      normalized.includes(`(${codeLower})`) ||
-      normalized.includes(abx.name.toLowerCase())
-    );
+      return (
+        normalized.startsWith(codeLower) ||
+        normalized.includes(`(${codeLower})`) ||
+        normalized.includes(abx.name.toLowerCase())
+      );
+    });
+
+    if (idx !== -1) {
+      mapping[`ast_${abx.code}`] = idx;
+    }
   });
-
-  if (idx !== -1) {
-    mapping[`ast_${abx.code}`] = idx;
-  }
-});
 
   return mapping;
 };
@@ -2257,7 +2257,7 @@ export default function App() {
           <button className="hdr-btn" style={{ background: "rgba(198,40,40,0.18)", borderColor: "rgba(198,40,40,0.35)" }} onClick={handleLogout} title="Logout">🚪</button>
         </div>
       </header>
- 
+
       {/* TABS */}
       <div className="tabs">
         <button className={`tab${tab === "entry" ? " active" : ""}`} onClick={() => setTab("entry")}>✏️ New Entry</button>
@@ -2266,7 +2266,7 @@ export default function App() {
         </button>
         <button className={`tab${tab === "report" ? " active" : ""}`} onClick={() => setTab("report")}>📊 Summary</button>
       </div>
- 
+
       {/* MAIN */}
       <div className="main">
         {tab === "entry" && (
@@ -2289,7 +2289,7 @@ export default function App() {
         )}
         {tab === "report" && <ReportPane records={records} />}
       </div>
- 
+
       {/* MODAL */}
       {viewId && (
         <ViewModal
@@ -2299,7 +2299,7 @@ export default function App() {
           onDelete={handleDelete}
         />
       )}
- 
+
       {/* IMPORT MODAL */}
       {importModalOpen && (
         <ImportModal
@@ -2310,7 +2310,7 @@ export default function App() {
           setLoading={setLoading}
         />
       )}
- 
+
       {/* TOASTS */}
       <div className="toast-con">
         {toasts.map((t) => (
